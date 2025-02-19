@@ -1,0 +1,176 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>VPS剩余价值计算器</title>
+    <link rel="stylesheet" href="./bootstrap.min.css">
+</head>
+<body>
+    <div class="container mt-5">
+        <h1 class="mb-4">VPS剩余价值计算器</h1>
+        <form id="calculatorForm">
+            <div class="form-group">
+                <label for="purchaseCurrency">续费价格货币类型：</label>
+                <select class="form-control" id="purchaseCurrency" name="purchaseCurrency">
+                    <option value="CNY">人民币 (CNY)</option> // 想增加什么货币就按照这格式添加即可
+                    <option value="USD">美元 (USD)</option>
+                    <option value="EUR">欧元 (EUR)</option>
+                    <option value="GBP">英镑 (GBP)</option>
+                    <option value="CAD">加元 (CAD)</option>
+                    <option value="JPY">日元 (JPY)</option>
+                    <option value="KRW">韩元 (KRW)</option>
+                    <option value="HKD">港币 (HKD)</option>
+                    <option value="TWD">新台币 (TWD)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="tradeCurrency">交易价格货币类型：</label>
+                <select class="form-control" id="tradeCurrency" name="tradeCurrency">
+                    <option value="CNY">人民币 (CNY)</option> // 跟上面同理
+                    <option value="USD">美元 (USD)</option>
+                    <option value="EUR">欧元 (EUR)</option>
+                    <option value="GBP">英镑 (GBP)</option>
+                    <option value="CAD">加元 (CAD)</option>
+                    <option value="JPY">日元 (JPY)</option>
+                    <option value="KRW">韩元 (KRW)</option>
+                    <option value="HKD">港币 (HKD)</option>
+                    <option value="TWD">新台币 (TWD)</option>
+                </select>
+            </div>
+            <div class="form-group">
+                <label for="exchangeRate">续费价格货币对人民币（CNY）的汇率：</label>
+                <input type="number" class="form-control" id="exchangeRate" name="exchangeRate" step="0.0001" required>
+            </div>
+            <div class="form-group">
+                <label for="tradeExchangeRate">交易价格货币对人民币（CNY）的汇率：</label>
+                <input type="number" class="form-control" id="tradeExchangeRate" name="tradeExchangeRate" step="0.0001" required>
+            </div>
+            <div class="form-group">
+                <label for="purchasePrice">续费价格：</label>
+                <input type="number" class="form-control" id="purchasePrice" name="purchasePrice" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="tradePrice">交易价格：</label>
+                <input type="number" class="form-control" id="tradePrice" name="tradePrice" step="0.01" required>
+            </div>
+            <div class="form-group">
+                <label for="currentDate">当前日期：</label>
+                <input type="date" class="form-control" id="currentDate" name="currentDate" required>
+            </div>
+            <div class="form-group">
+                <label for="expiryDate">到期日期：</label>
+                <input type="date" class="form-control" id="expiryDate" name="expiryDate" required>
+            </div>
+            <div class="form-group">
+                <label for="paymentFrequency">付款周期：</label>
+                <select class="form-control" id="paymentFrequency" name="paymentFrequency" required>
+                    <option value="yearly">年付</option>
+                    <option value="halfyearly">半年付</option>
+                    <option value="quarterly">季付</option>
+                    <option value="monthly">月付</option>
+                    <option value="two-yearly">二年付</option>
+                    <option value="three-yearly">三年付</option>
+                    <option value="five-yearly">五年付</option>
+                </select>
+            </div>
+            <button type="button" class="btn btn-primary" onclick="calculateRemainingValue()">计算剩余价值</button>
+        </form>
+
+        <div class="result mt-4" style="display: none;">
+            <h3>计算结果：</h3>
+            <p>续费价格等值人民币 (CNY): <span id="resultPurchasePriceCNY"></span></p>
+            <p>交易价格等值人民币 (CNY): <span id="resultTradePriceCNY"></span></p>
+            <p>剩余价值 (CNY): <span id="resultRemainingValueCNY"></span></p>
+            <p>溢价金额 (CNY): <span id="resultPremiumCNY"></span></p>
+            <p>购买建议: <span id="resultAdvice"></span></p>
+        </div>
+
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.5.1.slim.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@popperjs/core@2.9.3/dist/umd/popper.min.js"></script>
+    <script src="./bootstrap.min.js"></script>
+
+<script>
+
+    document.addEventListener('DOMContentLoaded', function() {
+        fetchExchangeRates();
+    });
+
+    async function fetchExchangeRates() {
+        try {
+            const response = await fetch('exchange_rates.json'); // 要读取的汇率文件
+            const data = await response.json();
+            const rates = data.rates;
+
+            updateExchangeRate(document.getElementById('purchaseCurrency'), rates, 'exchangeRate');
+            updateExchangeRate(document.getElementById('tradeCurrency'), rates, 'tradeExchangeRate');
+            
+            document.getElementById('purchaseCurrency').addEventListener('change', function() {
+                updateExchangeRate(this, rates, 'exchangeRate');
+            });
+            document.getElementById('tradeCurrency').addEventListener('change', function() {
+                updateExchangeRate(this, rates, 'tradeExchangeRate');
+            });
+           document.getElementById("currentDate").valueAsDate = new Date();
+        } catch (error) {
+            console.error('Error fetching exchange rates:', error);
+        }
+    }
+
+    function updateExchangeRate(currencyElement, rates, rateInputId) {
+        const currency = currencyElement.value;
+        const rate = currency === 'CNY' ? 1 : rates[currency];
+        document.getElementById(rateInputId).value = rate;
+    }
+
+        function calculateRemainingValue() {
+            const purchaseCurrency = document.getElementById("purchaseCurrency").value;
+            const tradeCurrency = document.getElementById("tradeCurrency").value;
+            const exchangeRate = parseFloat(document.getElementById("exchangeRate").value);
+            const tradeExchangeRate = parseFloat(document.getElementById("tradeExchangeRate").value);
+            const purchasePrice = parseFloat(document.getElementById("purchasePrice").value);
+            const tradePrice = parseFloat(document.getElementById("tradePrice").value);
+            const currentDate = new Date(document.getElementById("currentDate").value);
+            const expiryDate = new Date(document.getElementById("expiryDate").value);
+            const paymentFrequency = document.getElementById("paymentFrequency").value;
+
+            const remainingDays = Math.floor((expiryDate - currentDate) / (24 * 60 * 60 * 1000));
+            const purchasePriceCNY = purchasePrice * exchangeRate;
+            const tradePriceCNY = tradePrice * tradeExchangeRate;
+            const remainingValue = calculateValueByFrequency(paymentFrequency, purchasePriceCNY, remainingDays);
+            const premium = tradePriceCNY - remainingValue;
+
+            displayResults(purchasePriceCNY, tradePriceCNY, remainingValue, premium);
+        }
+
+        function calculateValueByFrequency(paymentFrequency, price, days) {
+            let daysInPeriod;
+            switch(paymentFrequency) {
+                case 'yearly': daysInPeriod = 365; break;
+                case 'halfyearly': daysInPeriod = 182.5; break;
+                case 'quarterly': daysInPeriod = 91.25; break;
+                case 'monthly': daysInPeriod = 30.44; break;
+                case 'two-yearly': daysInPeriod = 730; break;
+                case 'three-yearly': daysInPeriod = 1095; break;
+                case 'five-yearly': daysInPeriod = 1825; break;
+                default: daysInPeriod = 365;
+            }
+            return (price / daysInPeriod) * days;
+        }
+
+        function displayResults(purchasePriceCNY, tradePriceCNY, remainingValue, premium) {
+            document.getElementById("resultPurchasePriceCNY").textContent = purchasePriceCNY.toFixed(2);
+            document.getElementById("resultTradePriceCNY").textContent = tradePriceCNY.toFixed(2);
+            document.getElementById("resultRemainingValueCNY").textContent = remainingValue.toFixed(2);
+            document.getElementById("resultPremiumCNY").textContent = premium.toFixed(2);
+
+            let advice = premium > 0 ? "存在溢价，请君三思而后行。" : premium < 0 ? "卖家血亏，快买，错过拍断大腿！" : "不议价，良心卖家！";
+            document.getElementById("resultAdvice").textContent = advice;
+
+            document.querySelector(".result").style.display = "block";
+        }
+    </script>
+</body>
+</html>
